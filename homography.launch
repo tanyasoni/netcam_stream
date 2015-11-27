@@ -1,0 +1,12 @@
+<launch>
+   <arg name="id" default="103" />
+   <param name="_image_transport" value="compressed" />
+   <node name="netcam_homography_$(arg id)" pkg="netcam_stream" type="netcam_homography" output="screen">
+    <param name="camera_id" value="$(arg id)" />
+    <param name="board_size_w" value="6" />
+    <param name="board_size_h" value="7" />
+    <param name="square_size" value="0.108" />
+	<param name="board_offset_x" value="6.871" />
+    <param name="board_offset_y" value="1.362" />
+   </node>
+</launch>

@@ -1,0 +1,6 @@
+<launch>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" default="100" /> </include>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" default="101" /> </include>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" default="102" /> </include>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" default="103" /> </include>
+</launch>
