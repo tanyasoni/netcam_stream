@@ -1,14 +1,16 @@
 <launch>
-  <arg name="id" default="103" />
+  <arg name="id" default="103" doc="The id of the camera stream that needs to be subscribed to." />
+  <arg name="x_coeff" default="-1" doc="Possible values: {1, -1}. Describes which direction the x-axis positive values face." />
+  <arg name="y_coeff" default="-1" doc="Possible values: {1, -1}. Describes which direction the y-axis positive values face." />
   <param name="_image_transport" value="compressed" />
   <node name="netcam_homography_$(arg id)" pkg="netcam_stream" type="netcam_homography" output="screen">
     <param name="camera_id" value="$(arg id)" />
     <param name="board_size_w" value="6" />
     <param name="board_size_h" value="7" />
     <param name="square_size" value="0.108" />
-    <param name="board_offset_x" value="4.8" />
-    <param name="board_offset_y" value="1.2" />
-    <param name="x_coeff" value="-1" /> <!--doc="Possible values: {1, -1}. Describes which direction the x-axis positive values face." -->
-    <param name="y_coeff" value="-1" /> <!--doc="Possible values: {1, -1}. Describes which direction the y-axis positive values face." -->
+    <param name="board_offset_x" value="0" />
+    <param name="board_offset_y" value="0" />
+    <param name="x_coeff" value="$(arg x_coeff)" />
+    <param name="y_coeff" value="$(arg y_coeff)" /> 
   </node>
 </launch>

@@ -133,7 +133,6 @@ void chessboardMouseCallback(int event, int x, int y, int flags, void* userdata)
         perspectiveTransform(img_pnt, scene_pnt, H);
 
         ROS_INFO_STREAM("[CALC_HOMOGRAPHY] Transformed point: " << scene_pnt[0]);
-
     }
 }
 
@@ -157,7 +156,7 @@ int main(int argc, char** argv)
     node.getParam("board_offset_x", x); node.getParam("board_offset_y", y);
     BOARD_OFFSET = Point2f(x, y);
     node.getParam("x_coeff", x_coeff); node.getParam("y_coeff", y_coeff);
-
+    ROS_INFO("%d, %d", x_coeff, y_coeff);
     // Set up topics
     ROS_INFO("[CALC_HOMOGRAPHY] Setting up topics.");
     image_transport::ImageTransport it(node);
