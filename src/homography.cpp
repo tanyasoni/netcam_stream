@@ -10,6 +10,8 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <camera_info_manager/camera_info_manager.h> 
 #include <ros/console.h>
+#include <ros/package.h>
+#include <iostream>
 
 using namespace cv;
 using namespace ros;
@@ -30,6 +32,8 @@ std::string to_str(T a)
 bool to_process = false;
 bool got_cam_params = false;
 cv::Mat frame, K, distcoeff, H;
+int x_coeff, y_coeff;
+bool new_image = false;
 
 
 static void calcChessboardCorners2D(Size boardSize, float squareSize, vector<Point2f>& corners)
@@ -37,8 +41,8 @@ static void calcChessboardCorners2D(Size boardSize, float squareSize, vector<Poi
     corners.resize(0);
     for( int i = 0; i < boardSize.height; i++ )
         for( int j = 0; j < boardSize.width; j++ )
-            corners.push_back(Point2f(-float(j*squareSize),
-                                      -float(i*squareSize)) + BOARD_OFFSET);
+            corners.push_back(Point2f(x_coeff * float(j*squareSize),
+                                      y_coeff * float(i*squareSize)) + BOARD_OFFSET);
 }
 
 void calc_homography(Mat& image)
@@ -52,7 +56,7 @@ void calc_homography(Mat& image)
 
     // if (found)
     // {
-    //     // May lead to floating corners
+    //     // May lead to drifting corners
     //     Mat viewGray;
     //     cvtColor(image, viewGray, CV_BGR2GRAY);
     //     cornerSubPix(viewGray, pointBuf, Size(11,11),
@@ -70,13 +74,16 @@ void calc_homography(Mat& image)
         ROS_INFO_STREAM("[CALC_HOMOGRAPHY] H: " << H);
 
         // Save to file
-        FileStorage fs("homography.yaml", FileStorage::WRITE);
+        std::string path = ros::package::getPath("netcam_stream");
+        FileStorage fs(path + "/calibration/homography" + to_str(CAMERA_ID) + ".yaml", FileStorage::WRITE);
         fs << "H_" + to_str(CAMERA_ID) << H;
         fs.release();
 
-        // Add to params
-        // std::vector<float> Harr;
-        // Harr.assign((float*)H.datastart, (float*)H.dataend);
+        // Output to terminal in formated way:
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+                std::cout << "H" << i << j << " " << H.at<double>(i, j) << std::endl;
+            
     }
     imshow("Calc Board", image);
     waitKey(10);
@@ -90,8 +97,7 @@ void imageCb(const sensor_msgs::ImageConstPtr& msg)
     cv_bridge::CvImagePtr cv_ptr;
     cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
     frame = cv_ptr->image;
-
-    imshow("Board", frame);
+    new_image = true;
 }
 
 void camera_info(const sensor_msgs::CameraInfo::ConstPtr& msg)
@@ -150,6 +156,7 @@ int main(int argc, char** argv)
     double x, y;  
     node.getParam("board_offset_x", x); node.getParam("board_offset_y", y);
     BOARD_OFFSET = Point2f(x, y);
+    node.getParam("x_coeff", x_coeff); node.getParam("y_coeff", y_coeff);
 
     // Set up topics
     ROS_INFO("[CALC_HOMOGRAPHY] Setting up topics.");
@@ -162,7 +169,7 @@ int main(int argc, char** argv)
 
     namedWindow("Board");
     setMouseCallback("Board", chessboardMouseCallback, NULL);
-    ROS_INFO("Place the calibration board on the desired position (described by the offset params)"
+    ROS_INFO("Place the calibration board on the desired position (described by the offset params) "
                 "and press 'h' on the image to calculate the homography.");
     while (node.ok()) {
         if (to_process){
@@ -170,6 +177,11 @@ int main(int argc, char** argv)
             to_process = false;
         }
         
+        if (new_image){
+            imshow("Board", frame);
+            new_image = false;
+        }
+
         char k = waitKey(10);
         if (k == 'h')
             to_process = true;

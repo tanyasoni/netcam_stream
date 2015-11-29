@@ -1,6 +1,11 @@
 <launch>
-	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" default="100" /> </include>
-	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" default="101" /> </include>
-	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" default="102" /> </include>
-	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" default="103" /> </include>
+	<arg name="launch_user" default="user"/>
+	<arg name="launch_pass" default="pass"/>
+
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" value="100" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" value="101" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" value="102" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" value="103" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" value="104" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
+	<include file="$(find netcam_stream)/netcam.launch"> <arg name="id" value="105" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
 </launch>

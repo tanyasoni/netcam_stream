@@ -33,17 +33,27 @@ int main(int argc, char** argv)
     std::stringstream ss;
     ss << id;
     CAMERA_ID = ss.str();
+
     std::string user, pass;
-    if (!node.getParam("/cam_user", user))
-        ROS_ERROR("[NETCAM_STREAM] Cannot read username from param server.");
-    if (!node.getParam("/cam_pass", pass))
-        ROS_ERROR("[NETCAM_STREAM] Cannot read password from param server.");
+    if (!node.getParam("/cam_user", user)){
+        if (!node.getParam("/launch_user", user) || (user == "user")){
+            ROS_ERROR("[NETCAM_STREAM] Cannot read username from param server (cam_user) or launch file is not changed (launch_user).");
+            return 1;
+        }
+        ROS_INFO("The user is: %s", user.c_str());
+    }
+    if (!node.getParam("/cam_pass", pass)){
+        if (!node.getParam("/launch_pass", pass) || (pass == "pass")){
+            ROS_ERROR("[NETCAM_STREAM] Cannot read password from param server (cam_pass) or launch file is not changed (launch_pass).");
+            return 1;
+        }
+    }
 
     image_transport::ImageTransport it(node);
     image_transport::Publisher pub = it.advertise("image_raw", 1);
     std::string path = ros::package::getPath("netcam_stream");
     ROS_INFO("[NETCAM_STREAM] Path to calibration files: %s", path.c_str());
-    camera_info_manager::CameraInfoManager cim(node, "netcam_stream_" + CAMERA_ID, "file://" + path + "/cam"+ CAMERA_ID + ".yaml");
+    camera_info_manager::CameraInfoManager cim(node, "netcam_stream_" + CAMERA_ID, "file://" + path + "/calibration/cam"+ CAMERA_ID + ".yaml");
     
     ros::Publisher pub_info = node.advertise<sensor_msgs::CameraInfo>("camera_info", 1);
 
@@ -54,17 +64,21 @@ int main(int argc, char** argv)
     cv::VideoCapture net_cam;
     bool isOpened = net_cam.open("http://" + user + ":" + pass + "@192.168.107." + CAMERA_ID + "/mjpg/video.mjpg"); 
     if (!isOpened){
-        ROS_ERROR("[NETCAM_STREAM] Network camera stream is not opened!");
+        ROS_ERROR("[NETCAM_STREAM] Network camera stream is not opened! Have you checked the username and password. Trying to access '%s'", ("http://" + user + ":{the_password}@192.168.107." + CAMERA_ID + "/mjpg/video.mjpg").c_str());
         return 1;
     }
 
     ros::Rate loop_rate(30); //30Hz
     unsigned int frame_id = 0;
     while (node.ok()) {
+        ros::spinOnce();
+
         cv::Mat frame;
         net_cam >> frame;   
-        if (frame.empty())
-            ROS_ERROR("[NETCAM_STREAM] Camera returned empty frame!");
+        if (frame.empty()){
+            ROS_WARN("[NETCAM_STREAM] Camera returned empty frame! Skipping...");
+            continue;
+        }
         ++frame_id;
         sensor_msgs::ImagePtr image = cv_bridge::CvImage(std_msgs::Header(), "bgr8", frame).toImageMsg();
         
@@ -77,7 +91,6 @@ int main(int argc, char** argv)
         pub.publish(image);
         pub_info.publish(ci);
 
-        ros::spinOnce();
         loop_rate.sleep();
     }
 
