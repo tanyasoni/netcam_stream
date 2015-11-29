@@ -63,15 +63,16 @@ void calc_homography(Mat& image)
     //           Size(-1,-1), TermCriteria(CV_TERMCRIT_EPS+CV_TERMCRIT_ITER, 30, 0.1));
     // }
     drawChessboardCorners(image, BOARD_SIZE, Mat(pointBuf), found);
+    ROS_INFO("[CALC_HOMOGRAPHY] Found board: %d", found);
 
     if (found)
     {
-        std::cout << pointBuf.size() << pointBuf << std::endl;
-        std::cout << real_corners.size() << real_corners << std::endl;
+        ROS_DEBUG_STREAM("Number of calc. points: " << pointBuf.size() << std::endl << pointBuf << std::endl);
+        ROS_DEBUG_STREAM("Number of found points: " << real_corners.size() << std::endl << real_corners << std::endl);
 
         H = cv::findHomography(pointBuf, real_corners);
 
-        ROS_INFO_STREAM("[CALC_HOMOGRAPHY] H: " << H);
+        ROS_INFO_STREAM("[CALC_HOMOGRAPHY] H:\n" << H);
 
         // Save to file
         std::string path = ros::package::getPath("netcam_stream");
@@ -87,7 +88,6 @@ void calc_homography(Mat& image)
     }
     imshow("Calc Board", image);
     waitKey(10);
-    ROS_INFO("[CALC_HOMOGRAPHY] Found board: %d", found);
 
 }
 
@@ -162,15 +162,15 @@ int main(int argc, char** argv)
     ROS_INFO("[CALC_HOMOGRAPHY] Setting up topics.");
     image_transport::ImageTransport it(node);
     image_transport::Subscriber sub = it.subscribe("/netcam_stream_" + to_str(CAMERA_ID) + "/image_rect_color", 1, &imageCb);
-    ros::Subscriber cam_info_sub = node.subscribe("/netcam_stream_" + to_str(CAMERA_ID) + "/camera_info", 1, &camera_info);
+    ros::Subscriber cam_info_sub =  node.subscribe("/netcam_stream_" + to_str(CAMERA_ID) + "/camera_info", 1, &camera_info);
 
     ros::Rate loop_rate(30);
     unsigned int frame_id = 0;
 
     namedWindow("Board");
     setMouseCallback("Board", chessboardMouseCallback, NULL);
-    ROS_INFO("Place the calibration board on the desired position (described by the offset params) "
-                "and press 'h' on the image to calculate the homography.");
+    ROS_INFO("[CALC_HOMOGRAPHY] Place the calibration board on the desired position (described by the offset params) "
+                "and press 'h' on the image to calculate the homography. Re-press 'h' to re-attempt.");
     while (node.ok()) {
         if (to_process){
             calc_homography(frame);

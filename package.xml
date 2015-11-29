@@ -10,7 +10,7 @@
     Daniel Angelov
   </maintainer>
 
-  <license>BSD</license>
+  <license>MIT</license>
 
 
   <buildtool_depend>catkin</buildtool_depend>

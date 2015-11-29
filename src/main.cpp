@@ -68,7 +68,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    ros::Rate loop_rate(30); //30Hz
+    ros::Rate loop_rate(30); // 30Hz
     unsigned int frame_id = 0;
     while (node.ok()) {
         ros::spinOnce();
