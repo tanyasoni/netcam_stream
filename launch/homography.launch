@@ -1,8 +1,8 @@
 <launch>
-  <arg name="id" default="103" doc="The id of the camera stream that needs to be subscribed to." />
+  <arg name="id" doc="The id of the camera stream that the homography needs to be found." />
   <arg name="x_coeff" default="-1" doc="Possible values: {1, -1}. Describes which direction the x-axis positive values face." />
   <arg name="y_coeff" default="-1" doc="Possible values: {1, -1}. Describes which direction the y-axis positive values face." />
-  <param name="_image_transport" value="compressed" />
+  <param name="image_transport" value="compressed" />
   <node name="netcam_homography_$(arg id)" pkg="netcam_stream" type="netcam_homography" output="screen">
     <param name="camera_id" value="$(arg id)" />
     <param name="board_size_w" value="6" />

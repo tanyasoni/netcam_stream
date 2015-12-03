@@ -87,8 +87,8 @@ void calc_homography(Mat& image) {
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 3; ++j)
                 std::cout << "H" << i << j << " " << H.at<double>(i, j) << std::endl;
-
     }
+
     imshow("Calc Board", image);
     waitKey(10);
 
@@ -167,13 +167,13 @@ int main(int argc, char** argv) {
                        to_str(CAMERA_ID) + "/camera_info", 1, &camera_info);
 
     ros::Rate loop_rate(30);
-    unsigned int frame_id = 0;
 
     namedWindow("Board");
     setMouseCallback("Board", chessboardMouseCallback, NULL);
     ROS_INFO(
         "[CALC_HOMOGRAPHY] Place the calibration board on the desired position (described by the offset params) "
         "and press 'h' on the image to calculate the homography. Re-press 'h' to re-attempt.");
+    
     while (node.ok()) {
         if (to_process) {
             calc_homography(frame);

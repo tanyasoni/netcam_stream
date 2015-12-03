@@ -34,3 +34,30 @@ mv ost.txt ost.ini
 rosrun camera_calibration_parsers convert ost.ini camX.yaml
 mv camX.yaml ~/catkin_ws/src/netcam_stream/calibration
 ```
+
+# Homography
+
+Homography can be estimated by launching the associated launch file:
+
+```
+roslaunch netcams_stream homography.launch id:=X
+```
+
+Afterwards, place the calibration board on the plane that the homography transformation needs to be estimated to.
+Press 'h' to calculate. Repeat until results are satisfied.
+
+This also generates a 'homographyX.yaml' file in the calibration directory.
+
+# Install
+
+To install the package, run 
+```
+catkin_make install
+```
+
+Then navigate to the catkin_ws/install directory and copy the content of lib/network_stream and share/network_stream
+```
+roscd
+sudo cp -r install/lib/netcam_stream/ /opt/ros/indigo/lib
+sudo cp -r install/share/netcam_stream/ /opt/ros/indigo/share/
+```

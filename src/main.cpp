@@ -77,7 +77,6 @@ int main(int argc, char** argv) {
     }
 
     ros::Rate loop_rate(30); //30Hz
-    unsigned int frame_id = 0;
     while (node.ok()) {
         ros::spinOnce();
 
@@ -87,10 +86,10 @@ int main(int argc, char** argv) {
             ROS_WARN("[NETCAM_STREAM] Camera returned empty frame! Skipping...");
             continue;
         }
-        ++frame_id;
         sensor_msgs::ImagePtr image = cv_bridge::CvImage(std_msgs::Header(), "bgr8",
                                                          frame).toImageMsg();
 
+        std::string frame_id = "cam_" + CAMERA_ID;
         image->header.frame_id = frame_id;
         // Get current CameraInfo data
         sensor_msgs::CameraInfoPtr ci(
