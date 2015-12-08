@@ -14,20 +14,33 @@
 using namespace cv;
 using namespace ros;
 
+void clean_up_gracefully(std::string id)
+{
+    ros::param::del("~");
+    if (id.size() != 0){
+        ros::Duration(10).sleep(); // Wait before killing the node
+        system(("rosnode kill netcam_stream_" + id + "/image_proc_" + id).c_str());
+    }
+    ros::shutdown();
+}
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "netcam_stream");
 
     if (!ros::master::check()) {
-        ROS_ERROR("[NETCAM_STREAM] Cannot detect ROS master!");
+        ROS_FATAL("[NETCAM_STREAM] Cannot detect ROS master!");
+        clean_up_gracefully("");
         return 1;
     }
-    ROS_INFO("[NETCAM_STREAM] Advertising.");
 
     ros::NodeHandle node("~");
 
     int id; std::string CAMERA_ID;
-    if (!node.getParam("camera_id", id))
-        ROS_ERROR("[NETCAM_STREAM] Cannot read camera_id from param server.");
+    if (!node.getParam("camera_id", id)){
+        ROS_FATAL("[NETCAM_STREAM] Cannot read 'camera_id' from param server.");
+        clean_up_gracefully("");
+        return 0;
+    }
     std::stringstream ss;
     ss << id;
     CAMERA_ID = ss.str();
@@ -35,20 +48,23 @@ int main(int argc, char** argv) {
     std::string user, pass;
     if (!node.getParam("/cam_user", user)) {
         if (!node.getParam("/launch_user", user) || (user == "user")) {
-            ROS_ERROR(
+            ROS_FATAL(
                 "[NETCAM_STREAM] Cannot read username from param server (cam_user) or launch file is not changed (launch_user).");
-            return 1;
+            clean_up_gracefully(CAMERA_ID);
+            return 0;
         }
         ROS_INFO("The user is: %s", user.c_str());
     }
     if (!node.getParam("/cam_pass", pass)) {
         if (!node.getParam("/launch_pass", pass) || (pass == "pass")) {
-            ROS_ERROR(
+            ROS_FATAL(
                 "[NETCAM_STREAM] Cannot read password from param server (cam_pass) or launch file is not changed (launch_pass).");
-            return 1;
+            clean_up_gracefully(CAMERA_ID);
+            return 0;
         }
     }
 
+    ROS_INFO("[NETCAM_STREAM] Advertising.");
     image_transport::ImageTransport it(node);
     image_transport::Publisher pub = it.advertise("image_raw", 1);
     std::string path = ros::package::getPath("netcam_stream");
@@ -69,21 +85,29 @@ int main(int argc, char** argv) {
                         "http://" + user + ":" + pass + "@192.168.107." +
                         CAMERA_ID + "/mjpg/video.mjpg");
     if (!isOpened) {
-        ROS_ERROR(
+        ROS_FATAL(
             "[NETCAM_STREAM] Network camera stream is not opened! Have you checked the username and password. Trying to access '%s'",
             ("http://" + user + ":{the_password}@192.168.107." + CAMERA_ID +
              "/mjpg/video.mjpg").c_str());
-        return 1;
+        clean_up_gracefully(CAMERA_ID);
+        return 0;
     }
 
     ros::Rate loop_rate(30); //30Hz
     while (node.ok()) {
         ros::spinOnce();
 
+        if (pub.getNumSubscribers() == 0)
+        {
+            loop_rate.sleep();
+            continue;
+        }   
+
         cv::Mat frame;
         net_cam >> frame;
         if (frame.empty()) {
             ROS_WARN("[NETCAM_STREAM] Camera returned empty frame! Skipping...");
+            loop_rate.sleep();
             continue;
         }
         sensor_msgs::ImagePtr image = cv_bridge::CvImage(std_msgs::Header(), "bgr8",
@@ -103,7 +127,6 @@ int main(int argc, char** argv) {
         loop_rate.sleep();
     }
 
-    ros::param::del("~");
-    ros::shutdown();
+    clean_up_gracefully(CAMERA_ID);
     return 0;
 }

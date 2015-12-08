@@ -141,10 +141,13 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "calc_homography");
     if (!ros::master::check()) {
         ROS_ERROR("[CALC_HOMOGRAPHY] Cannot detect ROS master!");
+        ros::param::del("~");
+        ros::shutdown();
         return 1;
     }
 
     ros::NodeHandle node("~");
+    
     // Get params
     node.getParam("camera_id", CAMERA_ID);
     int w, h;
@@ -156,6 +159,7 @@ int main(int argc, char** argv) {
     BOARD_OFFSET = Point2f(x, y);
     node.getParam("x_coeff", x_coeff); node.getParam("y_coeff", y_coeff);
     ROS_INFO("%d, %d", x_coeff, y_coeff);
+    
     // Set up topics
     ROS_INFO("[CALC_HOMOGRAPHY] Setting up topics.");
     image_transport::ImageTransport it(node);
