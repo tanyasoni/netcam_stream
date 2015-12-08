@@ -57,7 +57,7 @@ catkin_make install
 
 Then navigate to the catkin_ws/install directory and copy the content of lib/network_stream and share/network_stream
 ```
-roscd
+roscd && cd ..
 sudo cp -r install/lib/netcam_stream/ /opt/ros/indigo/lib
 sudo cp -r install/share/netcam_stream/ /opt/ros/indigo/share/
 ```
