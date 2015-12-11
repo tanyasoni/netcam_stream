@@ -80,10 +80,10 @@ int main(int argc, char** argv) {
     if (cim.isCalibrated())
         ROS_INFO("[NETCAM_STREAM] Camera is calibrated!");
 
+    std::string cam_url = "http://" + user + ":" + pass + "@192.168.107." +
+                          CAMERA_ID + "/mjpg/video.mjpg";
     cv::VideoCapture net_cam;
-    bool isOpened = net_cam.open(
-                        "http://" + user + ":" + pass + "@192.168.107." +
-                        CAMERA_ID + "/mjpg/video.mjpg");
+    bool isOpened = net_cam.open(cam_url);
     if (!isOpened) {
         ROS_FATAL(
             "[NETCAM_STREAM] Network camera stream is not opened! Have you checked the username and password. Trying to access '%s'",
@@ -106,8 +106,10 @@ int main(int argc, char** argv) {
         cv::Mat frame;
         net_cam >> frame;
         if (frame.empty()) {
-            ROS_WARN("[NETCAM_STREAM] Camera returned empty frame! Skipping...");
-            loop_rate.sleep();
+            ROS_WARN("[NETCAM_STREAM] Camera returned empty frame! Skipping.");
+            ROS_INFO("[NETCAM_STREAM] Reopening stream...");
+            if (!net_cam.open(cam_url))
+                ROS_FATAL("[NETCAM_STREAM] Network camera stream cannot be opened!");
             continue;
         }
         sensor_msgs::ImagePtr image = cv_bridge::CvImage(std_msgs::Header(), "bgr8",
