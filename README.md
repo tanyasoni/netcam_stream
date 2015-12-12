@@ -22,7 +22,7 @@ Each camera is associated with a calibration file ('calibration/cam{id}.yaml'), 
 
 In order to calibrate the camera with id X, after starting the stream, run
 ```
-rosrun camera_calibration cameracalibrator.py --size 7x6 --square 0.108 image:=/netcam_stream_X/image_raw camera:/
+rosrun camera_calibration cameracalibrator.py --size 7x6 --square 0.108 image:=/netcam_stream_X/image_raw camera:=/netcam_stream_X
 ```
 Remember to move the resulting calibration file to the right place.
 
