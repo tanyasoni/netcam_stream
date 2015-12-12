@@ -1,35 +1,75 @@
 #include <string>
 #include <sstream>
+
+#include <signal.h>
+
+
+
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 
 #include <sensor_msgs/CameraInfo.h>
 #include <camera_info_manager/camera_info_manager.h>
 #include <ros/package.h>
 
+#include <ros/xmlrpc_manager.h>
+
 using namespace cv;
 using namespace ros;
 
-void clean_up_gracefully(std::string id)
+void clean_up_gracefully(std::string id = "")
 {
     ros::param::del("~");
+    ros::shutdown();
     if (id.size() != 0){
-        ros::Duration(10).sleep(); // Wait before killing the node
+        ROS_INFO("Attempting to kill image_proc in 2 sec.");
+        ros::Duration(2).sleep(); // Wait before killing the node
         system(("rosnode kill netcam_stream_" + id + "/image_proc_" + id).c_str());
     }
-    ros::shutdown();
 }
 
+// Replacement SIGINT handler
+void mySigIntHandler(int sig)
+{
+    ROS_WARN("Shutdown request received. Reason id: %d", sig);
+    clean_up_gracefully();
+}
+
+// Replacement "shutdown" XMLRPC callback
+void shutdownCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+{
+    int num_params = 0;
+    if (params.getType() == XmlRpc::XmlRpcValue::TypeArray)
+    num_params = params.size();
+    if (num_params > 1)
+    {
+        std::string reason = params[1];
+        ROS_WARN("Shutdown request received. Reason: [%s]", reason.c_str());
+        clean_up_gracefully();
+    }
+
+    result = ros::xmlrpc::responseInt(1, "", 0);
+}
+
+
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "netcam_stream");
+    // Initialize ROS, handles, etc
+    ros::init(argc, argv, "netcam_stream", ros::init_options::NoSigintHandler);
+
+    // Create a handler for signals (Ctrl+C)
+    signal(SIGINT, mySigIntHandler);
+    // Override XMLRPC shutdown
+    ros::XMLRPCManager::instance()->unbind("shutdown");
+    ros::XMLRPCManager::instance()->bind("shutdown", shutdownCallback);
 
     if (!ros::master::check()) {
         ROS_FATAL("[NETCAM_STREAM] Cannot detect ROS master!");
-        clean_up_gracefully("");
+        clean_up_gracefully();
         return 1;
     }
 
@@ -38,7 +78,7 @@ int main(int argc, char** argv) {
     int id; std::string CAMERA_ID;
     if (!node.getParam("camera_id", id)){
         ROS_FATAL("[NETCAM_STREAM] Cannot read 'camera_id' from param server.");
-        clean_up_gracefully("");
+        clean_up_gracefully();
         return 0;
     }
     std::stringstream ss;
@@ -93,7 +133,7 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    ros::Rate loop_rate(30); //30Hz
+    ros::Rate loop_rate(30); // 30Hz
     while (node.ok()) {
         ros::spinOnce();
 
@@ -108,6 +148,7 @@ int main(int argc, char** argv) {
         if (frame.empty()) {
             ROS_WARN("[NETCAM_STREAM] Camera returned empty frame! Skipping.");
             ROS_INFO("[NETCAM_STREAM] Reopening stream...");
+
             if (!net_cam.open(cam_url))
                 ROS_FATAL("[NETCAM_STREAM] Network camera stream cannot be opened!");
             continue;
