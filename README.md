@@ -40,7 +40,7 @@ mv camX.yaml ~/catkin_ws/src/netcam_stream/calibration
 Homography can be estimated by launching the associated launch file:
 
 ```
-roslaunch netcams_stream homography.launch id:=X
+roslaunch netcam_stream homography.launch id:=X
 ```
 
 Afterwards, place the calibration board on the plane that the homography transformation needs to be estimated to.
