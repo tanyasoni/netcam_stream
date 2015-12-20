@@ -7,13 +7,13 @@ Additionally give ability to find homography to the plane defined by a calibrati
 
 To start a stream on an individual camera call the
 ```
-roslaunch netcams_stream netcam.launch id:=X
+roslaunch netcam_stream netcam.launch id:=X
 ```
 where 'X' is the ID of the camera you want to launch. Additionally you can specify launch_user and launch_pass if they are not set in the paramter server.
 
 To launch all cameras, run
 ```
-roslaunch netcams_stream all_netcams.launch
+roslaunch netcam_stream all_netcams.launch
 ```
 
 # Details
