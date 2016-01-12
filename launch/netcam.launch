@@ -1,10 +1,11 @@
 <launch>
    <arg name="id" />
+   <arg name="frame_rate" default="30"/>
    <arg name="launch_user" default="user"/>
    <arg name="launch_pass" default="pass"/>
    <param name="launch_user" value="$(arg launch_user)" />
    <param name="launch_pass" value="$(arg launch_pass)" />
-
+   <param name="frame_rate" value="$(arg frame_rate)" />
    <node name="netcam_stream_$(arg id)" pkg="netcam_stream" type="netcam_stream_node" output="screen">
     <param name="camera_id" value="$(arg id)" />
    </node>
