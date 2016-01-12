@@ -11,6 +11,12 @@ roslaunch netcam_stream netcam.launch id:=X
 ```
 where 'X' is the ID of the camera you want to launch. Additionally you can specify launch_user and launch_pass if they are not set in the paramter server.
 
+The created topic will stream at the highest frame rate given by the camera. To manually specify the publisher frame rate (e.g. 15 Hz), use the parameter as follows (the camera will be read at 30 Hz to avoid caching of images)
+
+```
+roslaunch netcam_stream netcam.launch id:=X frame_rate:=15
+```
+
 To launch all cameras, run
 ```
 roslaunch netcam_stream all_netcams.launch
