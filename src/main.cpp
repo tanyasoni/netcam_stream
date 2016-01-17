@@ -124,16 +124,13 @@ int main(int argc, char** argv) {
 
     ROS_INFO("[NETCAM_STREAM_%d] Advertising.", id);
     image_transport::ImageTransport it(node);
-    image_transport::Publisher pub = it.advertise("image_raw", 1);
+    image_transport::CameraPublisher cam_pub = it.advertiseCamera("image_raw", 1);
+
     std::string path = ros::package::getPath("netcam_stream");
     ROS_INFO("[NETCAM_STREAM_%d] Path to calibration files: %s", id, path.c_str());
     camera_info_manager::CameraInfoManager cim(
         node, "netcam_stream_" + CAMERA_ID,
         "file://" + path + "/calibration/cam" + CAMERA_ID + ".yaml");
-
-    ros::Publisher pub_info = node.advertise<sensor_msgs::CameraInfo>(
-                                  "camera_info", 1);
-
 
     if (cim.isCalibrated())
         ROS_INFO("[NETCAM_STREAM_%d] Camera is calibrated.", id);
@@ -182,17 +179,14 @@ int main(int argc, char** argv) {
             sensor_msgs::ImagePtr image = cv_bridge::CvImage(std_msgs::Header(), "bgr8",
                                                              frame).toImageMsg();
 
-            std::string frame_id = "cam_" + CAMERA_ID;
+            image->header.frame_id = "cam_" + CAMERA_ID;
             image->header.stamp = ros::Time::now();
-            image->header.frame_id = frame_id;
-            // Get current CameraInfo data
-            sensor_msgs::CameraInfoPtr ci(
-                new sensor_msgs::CameraInfo(cim.getCameraInfo()));
-            ci->header.frame_id = frame_id;
-            ci->header.stamp = image->header.stamp;
 
-            pub.publish(image);
-            pub_info.publish(ci);
+            // Get current CameraInfo data
+            sensor_msgs::CameraInfo ci = cim.getCameraInfo();
+            ci.header = image->header;
+
+            cam_pub.publish(*image, ci);
 
             to_publish = false;
         }
