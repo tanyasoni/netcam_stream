@@ -183,6 +183,7 @@ int main(int argc, char** argv) {
                                                              frame).toImageMsg();
 
             std::string frame_id = "cam_" + CAMERA_ID;
+            image->header.stamp = ros::Time::now();
             image->header.frame_id = frame_id;
             // Get current CameraInfo data
             sensor_msgs::CameraInfoPtr ci(
