@@ -3,11 +3,16 @@
    <arg name="frame_rate" default="30"/>
    <arg name="launch_user" default="user"/>
    <arg name="launch_pass" default="pass"/>
+   <arg name="machine" default="localhost"/>
+
+   <machine name="localhost" address="127.0.0.1" default="true"/>
+
    <param name="launch_user" value="$(arg launch_user)" />
    <param name="launch_pass" value="$(arg launch_pass)" />
    <param name="frame_rate" value="$(arg frame_rate)" />
-   <node name="netcam_stream_$(arg id)" pkg="netcam_stream" type="netcam_stream_node" output="screen">
+
+   <node name="netcam_stream_$(arg id)" pkg="netcam_stream" type="netcam_stream_node" output="screen" machine="$(arg machine)">
     <param name="camera_id" value="$(arg id)" />
    </node>
-   <node name="image_proc_$(arg id)" pkg="image_proc" type="image_proc" ns="netcam_stream_$(arg id)" output="screen" />
+   <node name="image_proc_$(arg id)" pkg="image_proc" type="image_proc" ns="netcam_stream_$(arg id)" output="screen" machine="$(arg machine)"/>
 </launch>
