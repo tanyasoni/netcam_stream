@@ -30,7 +30,7 @@ std::string to_str(T a) {
 
 bool to_process = false;
 bool got_cam_params = false;
-cv::Mat frame, K, distcoeff, H;
+cv::Mat frame, K, distcoeff, H, H_inv;
 int x_coeff, y_coeff;
 bool new_image = false;
 
@@ -87,6 +87,13 @@ void calc_homography(Mat& image) {
         for (int i = 0; i < 3; ++i)
             for (int j = 0; j < 3; ++j)
                 std::cout << "H" << i << j << " " << H.at<double>(i, j) << std::endl;
+
+        ROS_INFO("Matrix Inverse:");
+        H_inv = H.inv();
+        // Output to terminal in formated way:
+        for (int i = 0; i < 3; ++i)
+            for (int j = 0; j < 3; ++j)
+                std::cout << "H" << i << j << " " << H_inv.at<double>(i, j) << std::endl;
     }
 
     imshow("Calc Board", image);
@@ -147,7 +154,7 @@ int main(int argc, char** argv) {
     }
 
     ros::NodeHandle node("~");
-    
+
     // Get params
     node.getParam("camera_id", CAMERA_ID);
     int w, h;
@@ -159,7 +166,7 @@ int main(int argc, char** argv) {
     BOARD_OFFSET = Point2f(x, y);
     node.getParam("x_coeff", x_coeff); node.getParam("y_coeff", y_coeff);
     ROS_INFO("%d, %d", x_coeff, y_coeff);
-    
+
     // Set up topics
     ROS_INFO("[CALC_HOMOGRAPHY] Setting up topics.");
     image_transport::ImageTransport it(node);
@@ -177,7 +184,7 @@ int main(int argc, char** argv) {
     ROS_INFO(
         "[CALC_HOMOGRAPHY] Place the calibration board on the desired position (described by the offset params) "
         "and press 'h' on the image to calculate the homography. Re-press 'h' to re-attempt.");
-    
+
     while (node.ok()) {
         if (to_process) {
             calc_homography(frame);
