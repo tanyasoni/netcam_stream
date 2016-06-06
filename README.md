@@ -22,7 +22,7 @@ To launch all cameras, run
 roslaunch netcam_stream all_netcams.launch
 ```
 
-# Details
+# Calibration
 
 Each camera is associated with a calibration file ('calibration/cam{id}.yaml'), which needs to be located at the base of the file tree for the package.
 
@@ -32,7 +32,9 @@ rosrun camera_calibration cameracalibrator.py --size 7x6 --square 0.108 image:=/
 ```
 Remember to move the resulting calibration file to the right place.
 
-To convert it, rename the ost.txt found after uncompressing to ost.ini and parse it
+After the calibration has finished, commit it using the `Commit` button.
+
+Aleternatively, Save it. In order to convert it, rename the ost.txt found after uncompressing to ost.ini and parse it
 
 ```
 tar -zxvf /tmp/calibrationdata.tar.gz
