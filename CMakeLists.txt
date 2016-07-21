@@ -12,10 +12,17 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   image_transport
   camera_info_manager
+  visualization_msgs
+  image_geometry
+  tf
+  tf2_ros
+  tf2_eigen
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
+find_package(Eigen3 REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -54,11 +61,11 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+add_service_files(
+   FILES
+   ChessPose.srv
+   SetPose.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -68,10 +75,12 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   sensor_msgs#   std_msgs
-# )
+ generate_messages(
+   DEPENDENCIES
+   sensor_msgs
+   std_msgs
+   geometry_msgs
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -118,12 +127,17 @@ catkin_package(
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
+  ${yaml_cpp_INCLUDE_DIR}
 )
 
 ## Declare a C++ library
 # add_library(netcam_stream
 #   src/${PROJECT_NAME}/netcam_stream.cpp
 # )
+# Use c++11
+set(CMAKE_CXX_FLAGS "-std=c++11 ${CMAKE_CXX_FLAGS} -O2 -Wno-deprecated-register")
+
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -133,13 +147,21 @@ include_directories(
 ## Declare a C++ executable
 add_executable(netcam_stream_node src/main.cpp)
 add_executable(netcam_homography src/homography.cpp)
+add_executable(calibration_master src/calibration_master.cpp)
+add_executable(camera_node src/camera_node.cpp)
 
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(netcam_stream_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-
+add_dependencies(netcam_stream_node
+    ${catkin_EXPORTED_TARGETS}
+    ${${PROJECT_NAME}_EXPORTED_TARGETS}
+    netcam_stream_node_gencpp
+)
 ## Specify libraries to link a library or executable target against
+
+target_link_libraries(netcam_stream_node yaml-cpp)
 
 find_package(OpenCV)
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -149,6 +171,16 @@ target_link_libraries(netcam_stream_node
 )
 
 target_link_libraries(netcam_homography
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+target_link_libraries(calibration_master
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+target_link_libraries(camera_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
@@ -175,7 +207,7 @@ target_link_libraries(netcam_homography
 # )
 
 ## Mark cpp header files for installation
-# install(DIRECTORY include/${PROJECT_NAME}/
+# install(DIRECTORY include/${netcam_stream}/
 #   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
 #   FILES_MATCHING PATTERN "*.h"
 #   PATTERN ".svn" EXCLUDE

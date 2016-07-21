@@ -1,5 +1,6 @@
 #include <string>
 #include <sstream>
+#include <fstream>
 
 #include <signal.h>
 
@@ -7,6 +8,7 @@
 #include <opencv2/highgui/highgui.hpp>
 
 #include <ros/ros.h>
+#include <tf/transform_broadcaster.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
@@ -17,10 +19,22 @@
 
 #include <ros/xmlrpc_manager.h>
 
+#include "yaml-cpp/yaml.h"
+#include <tf2_ros/transform_broadcaster.h>
+#include <opencv2/opencv.hpp>
+#include <opencv/cv.h>
+#include <opencv2/core/core.hpp>
+
+#include <netcam_stream/SetPose.h>
+
 using namespace cv;
 using namespace ros;
+using namespace std;
 
 bool to_publish = false;
+bool pose_calibrated = false; // True if pose has been calibrated.
+geometry_msgs::TransformStamped camera_pose;
+string CAMERA_ID;
 
 void clean_up_gracefully(std::string id = "") {
     ros::param::del("~");
@@ -61,6 +75,49 @@ void publish_image_callback(const ros::TimerEvent&) {
     to_publish = true;
 }
 
+void ReadPoseFile(string pose_file_name, string CAMERA_ID)
+{
+    std::ifstream fin(pose_file_name.c_str());
+    YAML::Node doc = YAML::Load(fin);
+        
+    doc = doc["transform"];
+    YAML::Node sub_node = doc["translation"];
+    camera_pose.transform.translation.x = sub_node["x"].as<double>();
+    camera_pose.transform.translation.y = sub_node["y"].as<double>();
+    camera_pose.transform.translation.z = sub_node["z"].as<double>();
+
+    sub_node = doc["rotation"];
+    camera_pose.transform.rotation.x = sub_node["x"].as<double>();
+    camera_pose.transform.rotation.y = sub_node["y"].as<double>();
+    camera_pose.transform.rotation.z = sub_node["z"].as<double>();
+    camera_pose.transform.rotation.w = sub_node["w"].as<double>();
+
+    camera_pose.header.stamp = ros::Time::now();
+    camera_pose.header.frame_id = "InSpace_Lab";
+    camera_pose.child_frame_id = CAMERA_ID;
+
+    pose_calibrated = true;
+
+    ROS_INFO_STREAM("\n\n[NETCAM_STREAM_" << CAMERA_ID << "]: Reading file and setting pose. " << pose_calibrated);
+
+}
+
+bool SetCameraPose(netcam_stream::SetPose::Request  &req, netcam_stream::SetPose::Response &res)
+{
+    string path = ros::package::getPath("netcam_stream");
+    ofstream myfile;
+    myfile.open (path + "/extrinsic_pose/pose_" + CAMERA_ID + ".yaml");
+    myfile << req.pose;
+    myfile.close();
+    res.calibrated = true;
+    ROS_INFO_STREAM("\n\n\nPose written to file!: " << CAMERA_ID << "\n" << req.pose );
+    pose_calibrated = true;
+    camera_pose = req.pose;
+    camera_pose.header.frame_id = "InSpace_Lab";
+    camera_pose.child_frame_id = CAMERA_ID;
+    return true;
+}
+
 
 int main(int argc, char** argv) {
     // Initialize ROS, handles, etc
@@ -80,7 +137,7 @@ int main(int argc, char** argv) {
 
     ros::NodeHandle node("~");
 
-    int id; std::string CAMERA_ID;
+    int id;
     if (!node.getParam("camera_id", id)) {
         ROS_FATAL("[NETCAM_STREAM] Cannot read 'camera_id' from param server.");
         clean_up_gracefully();
@@ -156,14 +213,26 @@ int main(int argc, char** argv) {
     ros::Timer timer =
         node.createTimer(ros::Duration(1.0 / frame_rate), publish_image_callback);
 
-    while (node.ok()) {
-        ros::spinOnce();
+    static tf2_ros::TransformBroadcaster tfb;
+    // Checking if the pose file exists.
+    ROS_INFO_STREAM("\n\n[NETCAM_STREAM_" << CAMERA_ID << "]: Checking file");
+    string pose_file_name = path + "/extrinsic_pose/pose_" + CAMERA_ID + ".yaml";
+    if(access( pose_file_name.c_str(), F_OK ) != -1)
+    {
+        ROS_INFO_STREAM("\n\n[NETCAM_STREAM_" << CAMERA_ID << "]: File exists!");
+        pose_calibrated = true;
+        ReadPoseFile(pose_file_name,CAMERA_ID);
+    }
 
+    ros::ServiceServer pose_service = node.advertiseService("/netcam_stream_" 
+        + CAMERA_ID + "/set_pose", &SetCameraPose);
+
+    while (node.ok()) {
+        /*
         if (cam_pub.getNumSubscribers() == 0) {
             loop_rate.sleep();
             continue;
-        }
-
+        }*/
         cv::Mat frame;
         net_cam >> frame;
         if (frame.empty()) {
@@ -174,7 +243,6 @@ int main(int argc, char** argv) {
                 ROS_FATAL("[NETCAM_STREAM_%d] Network camera stream cannot be opened!", id);
             continue;
         }
-
         if (to_publish) {
             sensor_msgs::ImagePtr image = cv_bridge::CvImage(std_msgs::Header(), "bgr8",
                                                              frame).toImageMsg();
@@ -191,7 +259,15 @@ int main(int argc, char** argv) {
             to_publish = false;
         }
 
+        if(pose_calibrated)
+        {
+            camera_pose.header.stamp = ros::Time::now();
+            tfb.sendTransform(camera_pose);
+            //ROS_INFO_STREAM("\n\n[NETCAM_STREAM_" << CAMERA_ID << "]: Publishing transform");
+        }
+
         loop_rate.sleep();
+        ros::spinOnce();
     }
 
     clean_up_gracefully(CAMERA_ID);

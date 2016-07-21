@@ -1,0 +1,4 @@
+---
+int64 fatal_error_id
+bool board_found
+geometry_msgs/TransformStamped pose

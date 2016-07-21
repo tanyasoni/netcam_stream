@@ -1,0 +1,15 @@
+header: 
+  seq: 0
+  stamp: 1469114977.461446918
+  frame_id: 
+child_frame_id: 
+transform: 
+  translation: 
+    x: 0.633378
+    y: 0.767109
+    z: 3.47525
+  rotation: 
+    x: 0.13998
+    y: -0.0718108
+    z: -0.680641
+    w: 0.715526
