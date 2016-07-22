@@ -50,7 +50,7 @@
     </node>
 
     <node name="netcam_extrinsic_calibration_master_node" pkg="netcam_stream" type="calibration_master" output="screen">
-    <param name="all_camera_id" value="135,137,139,140,141" type="str"/>
+    <param name="all_camera_id" value="141,140,135,139,137" type="str"/>
     <param name="base_url" value="/netcam_stream_" type="str"/>
     <param name="origin" value="InSpace_Lab" type="str"/>
     </node>

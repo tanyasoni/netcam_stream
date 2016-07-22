@@ -98,7 +98,7 @@ void ReadPoseFile(string pose_file_name, string CAMERA_ID)
 
     pose_calibrated = true;
 
-    ROS_INFO_STREAM("\n\n[NETCAM_STREAM_" << CAMERA_ID << "]: Reading file and setting pose. " << pose_calibrated);
+    //ROS_INFO_STREAM("\n\n[NETCAM_STREAM_" << CAMERA_ID << "]: Reading file and setting pose. " << pose_calibrated);
 
 }
 
@@ -110,7 +110,7 @@ bool SetCameraPose(netcam_stream::SetPose::Request  &req, netcam_stream::SetPose
     myfile << req.pose;
     myfile.close();
     res.calibrated = true;
-    ROS_INFO_STREAM("\n\n\nPose written to file!: " << CAMERA_ID << "\n" << req.pose );
+    //ROS_INFO_STREAM("\n\n\nPose written to file!: " << CAMERA_ID << "\n" << req.pose );
     pose_calibrated = true;
     camera_pose = req.pose;
     camera_pose.header.frame_id = "InSpace_Lab";
