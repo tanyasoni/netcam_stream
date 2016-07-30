@@ -1,3 +1,2 @@
 geometry_msgs/TransformStamped pose
 ---
-bool calibrated

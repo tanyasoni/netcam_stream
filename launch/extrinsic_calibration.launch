@@ -3,11 +3,19 @@
     <arg name="launch_user" default="user"/>
     <arg name="launch_pass" default="pass"/>
 
-    <include file="$(find netcam_stream)/launch/netcam.launch"> <arg name="id" value="140" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
-    <include file="$(find netcam_stream)/launch/netcam.launch"> <arg name="id" value="139" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
     <include file="$(find netcam_stream)/launch/netcam.launch"> <arg name="id" value="137" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
+    <include file="$(find netcam_stream)/launch/netcam.launch"> <arg name="id" value="139" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
     <include file="$(find netcam_stream)/launch/netcam.launch"> <arg name="id" value="135" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
+    <include file="$(find netcam_stream)/launch/netcam.launch"> <arg name="id" value="140" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
     <include file="$(find netcam_stream)/launch/netcam.launch"> <arg name="id" value="141" /> <arg name="launch_user" value="$(arg launch_user)" /> <arg name="launch_pass" value="$(arg launch_pass)" /> </include>
+    
+    <node name="netcam_extrinsic_calibration_140" pkg="netcam_stream" type="camera_node" output="screen">
+    <param name="camera_id" value="140" type="str"/>
+    <param name="width_squares" value="6" type="int"/>
+    <param name="height_squares" value="7" type="int"/>
+    <param name="square_length" value="0.108" type="double"/>
+    <param name="base_url" value="/netcam_stream_" type="str"/>
+    </node>
 
     <node name="netcam_extrinsic_calibration_141" pkg="netcam_stream" type="camera_node" output="screen">
     <param name="camera_id" value="141" type="str"/>
@@ -24,7 +32,7 @@
     <param name="square_length" value="0.108" type="double"/>
     <param name="base_url" value="/netcam_stream_" type="str"/>
     </node>
-
+    
     <node name="netcam_extrinsic_calibration_137" pkg="netcam_stream" type="camera_node" output="screen">
     <param name="camera_id" value="137" type="str"/>
     <param name="width_squares" value="6" type="int"/>
@@ -41,16 +49,8 @@
     <param name="base_url" value="/netcam_stream_" type="str"/>
     </node>
 
-    <node name="netcam_extrinsic_calibration_140" pkg="netcam_stream" type="camera_node" output="screen">
-    <param name="camera_id" value="140" type="str"/>
-    <param name="width_squares" value="6" type="int"/>
-    <param name="height_squares" value="7" type="int"/>
-    <param name="square_length" value="0.108" type="double"/>
-    <param name="base_url" value="/netcam_stream_" type="str"/>
-    </node>
-
     <node name="netcam_extrinsic_calibration_master_node" pkg="netcam_stream" type="calibration_master" output="screen">
-    <param name="all_camera_id" value="141,140,135,139,137" type="str"/>
+    <param name="all_camera_id" value="137,139,135,140,141" type="str"/>
     <param name="base_url" value="/netcam_stream_" type="str"/>
     <param name="origin" value="InSpace_Lab" type="str"/>
     </node>

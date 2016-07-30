@@ -42,19 +42,18 @@ double square_length;
 Size board_size;
 vector<Point3f> board_points; // Coordinates of squares on chessboard(default).
 vector<Point2f> corners; // Coordinates of squares on chessboard(computed).
-cv::Mat_<double> quat;
 
 string base_url = "";
 string camera_id = "";
 bool cam_init = false; // Checks if camera matrices have been initialised.
-bool chessboard_found = false, cam_calibrated = false;
+bool chessboard_found = false, board_init = false;
 Mat intrinsics, distortion; // Stores camera intrinsic and distortion matrix.
 Mat img, rot_vec, trans_vec; // Image, Rotation and Translation Matrix.
 Mat old_rot_vec = Mat::ones(3, 1, CV_64F);
 Mat old_trans_vec = Mat::ones(3, 1, CV_64F);
 
 Eigen::Affine3d pose;
-geometry_msgs::TransformStamped chess_pose_ts;
+geometry_msgs::TransformStamped chess_pose_tf;
 
 int steady_count;
 cv_bridge::CvImagePtr img_converter;
@@ -116,8 +115,9 @@ bool DiffThreshold()
 		abs(rot_vec.at<double>(0,2) - old_rot_vec.at<double>(0,2)) < 0.1){
 		return true;
 	}
-	/*{
-		ROS_INFO_STREAM("\n\nchessboard_found: " << chessboard_found);
+	/*else
+	{
+		ROS_INFO_STREAM("\n\n[CAMERA_NODE_" << camera_id << "]: ");
 
 		ROS_INFO_STREAM("\n\nTrans_vec: " << trans_vec.at<double>(0,0) << " " << trans_vec.at<double>(0,1) << " " << 
 		trans_vec.at<double>(0,2));
@@ -146,7 +146,7 @@ void ChessboardPoseEstimate(const sensor_msgs::ImageConstPtr& msg)
 {
 	if (fatal_error != 0)
 		return;
-	if(!cam_init)
+	if(!cam_init || !board_init)
 	{
 		return;
 	}
@@ -159,11 +159,11 @@ void ChessboardPoseEstimate(const sensor_msgs::ImageConstPtr& msg)
 		ROS_ERROR("cv_bridge exception: %s", e.what());
 		return;
 	}
-	ROS_INFO_STREAM(camera_id);
 	mtx.lock();
 	img = img_converter->image;
 	chessboard_found = findChessboardCorners( img, board_size, corners);
-	drawChessboardCorners(img, board_size, corners, chessboard_found);
+	//drawChessboardCorners(img, board_size, corners, chessboard_found);
+	ROS_INFO_STREAM(camera_id);
 	if(corners.size() == board_size.height * board_size.width && chessboard_found)
 	{
 		// Refine the corner coordinates.
@@ -171,20 +171,24 @@ void ChessboardPoseEstimate(const sensor_msgs::ImageConstPtr& msg)
 		cvtColor(img, mask_sub_pixel, CV_BGR2GRAY);
 		cornerSubPix( mask_sub_pixel, corners, board_size, zeroZone, criteria );
 		chessboard_found = false;
+		
+		ROS_INFO_STREAM(camera_id);
 		// Calculate the transform
 		try
 		{
-			solvePnP(Mat(board_points), Mat(corners), intrinsics, distortion, rot_vec, trans_vec, false);
+			solvePnP(Mat(board_points), Mat(corners), intrinsics, distortion, rot_vec, trans_vec, false, CV_EPNP);
 		}
 		catch(Exception e)
-		{ 
-			ROS_WARN_STREAM("Exception in solvePnP" << e.what());
+		{
+			ROS_WARN_STREAM("Exception in solvePnP: " << e.what());
 			return;
 		}
-		/*ROS_INFO_STREAM("\n\n\nTrans_vec: " << trans_vec.at<double>(0,0) << " " << trans_vec.at<double>(0,1) 
-			<< " " << trans_vec.at<double>(0,2));
-		ROS_INFO_STREAM("\nRot_vec: " << rot_vec.at<double>(0,0) << " " << rot_vec.at<double>(0,1) << " " << 
-			rot_vec.at<double>(0,2));*/
+		//ROS_INFO_STREAM("[CAMERA_NODE_" << camera_id << "]: After solvePnP");
+		//ROS_INFO_STREAM("\n\n\nTrans_vec: " << trans_vec.at<double>(0,0) << " " << trans_vec.at<double>(0,1) 
+		//	<< " " << trans_vec.at<double>(0,2));
+		//ROS_INFO_STREAM("\nRot_vec: " << rot_vec.at<double>(0,0) << " " << rot_vec.at<double>(0,1) << " " << 
+		//	rot_vec.at<double>(0,2));
+
 		// Check if the chessboard is steady among frames.
 		if(DiffThreshold())
 			steady_count++;
@@ -203,8 +207,8 @@ void ChessboardPoseEstimate(const sensor_msgs::ImageConstPtr& msg)
 			Eigen::AngleAxisd(rot_vec.at<double>(0,0), Eigen::Vector3d::UnitX()) *
 			Eigen::AngleAxisd(rot_vec.at<double>(0,1), Eigen::Vector3d::UnitY()) *
 			Eigen::AngleAxisd(rot_vec.at<double>(0,2), Eigen::Vector3d::UnitZ());
-			chess_pose_ts = tf2::eigenToTransform(pose);
-			chess_pose_ts.header.stamp = ros::Time::now();
+			chess_pose_tf = tf2::eigenToTransform(pose);
+			chess_pose_tf.header.stamp = ros::Time::now();
 			chessboard_found = true;
 		}
 		
@@ -215,30 +219,28 @@ void ChessboardPoseEstimate(const sensor_msgs::ImageConstPtr& msg)
 		steady_count = 0;
 	}
 	mtx.unlock();
-	cv::imshow(camera_id, img_converter->image);
-    cv::waitKey(3);
+	//cv::imshow(camera_id, img_converter->image);
+    //cv::waitKey(3);
 }
 
 // Service to send pose of chessboard.
 bool ChessboardPoseService(netcam_stream::ChessPose::Request  &req, netcam_stream::ChessPose::Response &res)
 {
-	ROS_INFO_STREAM("[CAMERA_NODE_" << camera_id << "]: Service called!");
 	mtx.lock();
+	res.fatal_error_id = fatal_error;
 	if(fatal_error != 0)
 	{
-		res.fatal_error_id = fatal_error;
 		mtx.unlock();
 		return true;
 	}
-	res.fatal_error_id = fatal_error;
-	res.board_found = chessboard_found;
-	res.pose = chess_pose_ts;
-	if(chessboard_found)
+	if(steady_count > 5)
 	{
-		ROS_INFO_STREAM("[CAMERA_NODE_" << camera_id << "]: Transform sent!");
+		res.pose = chess_pose_tf;
+		res.board_found = chessboard_found;
 	}
+	else
+		res.board_found = false;
 	mtx.unlock();
-	ROS_INFO_STREAM("[CAMERA_NODE_" << camera_id << "]: Service return!");
 	return true;
 }
 
@@ -287,9 +289,11 @@ int main(int argc, char** argv)
 	{
 		for (int j=0; j<width_squares; j++)
 		{
-			board_points.push_back(cv::Point3f(j*square_length, i*square_length, 0));
+			board_points.push_back(cv::Point3f(i*square_length, (width_squares - 1 - j)*square_length, 0));
 		}
 	}
+	
+	board_init = true;
 	steady_count = 0; // Ensures that the chessboard is stationary.
 
     // Creating subscribers to image and camera info.
@@ -308,7 +312,7 @@ int main(int argc, char** argv)
 	ros::Subscriber sub = node_handle.subscribe("/netcam_extrinsic_calibration_master_node/camera_node_shutdown",
 	 10, &check_shutdown);
 
-	cv::namedWindow(camera_id);
+	//cv::namedWindow(camera_id);
 
 	while(ros::ok())
 	{

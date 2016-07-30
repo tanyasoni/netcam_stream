@@ -109,7 +109,6 @@ bool SetCameraPose(netcam_stream::SetPose::Request  &req, netcam_stream::SetPose
     myfile.open (path + "/extrinsic_pose/pose_" + CAMERA_ID + ".yaml");
     myfile << req.pose;
     myfile.close();
-    res.calibrated = true;
     //ROS_INFO_STREAM("\n\n\nPose written to file!: " << CAMERA_ID << "\n" << req.pose );
     pose_calibrated = true;
     camera_pose = req.pose;
@@ -215,11 +214,9 @@ int main(int argc, char** argv) {
 
     static tf2_ros::TransformBroadcaster tfb;
     // Checking if the pose file exists.
-    ROS_INFO_STREAM("\n\n[NETCAM_STREAM_" << CAMERA_ID << "]: Checking file");
     string pose_file_name = path + "/extrinsic_pose/pose_" + CAMERA_ID + ".yaml";
     if(access( pose_file_name.c_str(), F_OK ) != -1)
     {
-        ROS_INFO_STREAM("\n\n[NETCAM_STREAM_" << CAMERA_ID << "]: File exists!");
         pose_calibrated = true;
         ReadPoseFile(pose_file_name,CAMERA_ID);
     }

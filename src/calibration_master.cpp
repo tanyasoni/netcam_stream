@@ -38,21 +38,17 @@ struct CamCalibInfo{
 };
 
 list<CamCalibInfo> calibrated_cameras; // List to store info for calibrated cameras.
-list<CamCalibInfo> current_cam_info; // List to store the cameras currently bein calibrated.
-netcam_stream::ChessPose chess_srv;
-netcam_stream::SetPose set_pose_srv;
+list<CamCalibInfo> current_cam_info;   // List to store the cameras currently bein calibrated.
+netcam_stream::ChessPose chess_srv;    // Get pose from the camera node.
+netcam_stream::SetPose set_pose_srv;   // Set pose of camera through the main node.
 
 string base_url;
 list<string> cam_id_list;
 map<string,ros::ServiceClient> client_map;
 
 boost::mutex mtx;
-ofstream file_writer;
 
-list<geometry_msgs::TransformStamped> transform_list;
-string cam_shut_nodes;
-
-int thread_count;
+string cam_shut_nodes; // Camera nodes to be shut down.
 
 // Returns true for empty strings
 bool IsEmpty(const string& s){
@@ -94,30 +90,9 @@ void CreateList(string id_str, list<string>& cam_id_list){
   cam_id_list.unique();
 }
 
-/*
-void PublishTransform()
+void CallTransformService(string camera_id)
 {
-  static tf2_ros::TransformBroadcaster tfb;
-  geometry_msgs::TransformStamped transform_stamped;
-  CamCalibInfo temp;
-  string cam_published = "";
-  for(list<CamCalibInfo>::iterator it = calibrated_cameras.begin(); it != calibrated_cameras.end(); it++)
-  {
-    temp = CamCalibInfo(*it);
-    transform_stamped = temp.camera_transform;
-    transform_stamped.header.stamp = ros::Time::now();
-    transform_stamped.header.frame_id = "Inspace_Lab";
-    transform_stamped.child_frame_id = temp.camera_id;
-    //ROS_INFO_STREAM("\n\nSending transform: " << temp.camera_id);
-    tfb.sendTransform(transform_stamped);
-    cam_published += " " + temp.camera_id;
-  }
-  ROS_INFO_STREAM("\nPublishing: " << cam_published);
-}*/
-
-void CallTransformService(string camera_id, ros::NodeHandle &node_handle)
-{
-  thread_count++;
+  ROS_INFO_STREAM("Call service for: " << camera_id);
   if(!ros::service::waitForService(base_url + camera_id + "/chessboard_pose", 1))
   {
     ROS_ERROR_STREAM("\n\n[CALIBRATION_MASTER_NODE]: Failed Service call for " << camera_id<< "! Shutting down the node.");
@@ -126,13 +101,9 @@ void CallTransformService(string camera_id, ros::NodeHandle &node_handle)
     return;
   }
   mtx.lock();
-  // Find service client corresponding to the camera id.
-  list<string>::iterator cam_list_iter;
-  cam_list_iter = find(cam_id_list.begin(), cam_id_list.end(),camera_id);
-  int index = distance(cam_id_list.begin(), cam_list_iter);
+  
   // Call the service to get chessboard transform.
-  ROS_INFO_STREAM("[CALIBRATION_MASTER_NODE]: Calling service: " << camera_id);
-  if(client_map[camera_id].call(chess_srv))
+  if(ros::service::call(base_url + camera_id + "/chessboard_pose",chess_srv))
   {
     // Error encountered!
     if(chess_srv.response.fatal_error_id != 0)
@@ -176,18 +147,14 @@ void CallTransformService(string camera_id, ros::NodeHandle &node_handle)
 }
 
 
-void CallSetPoseService(string camera_id, geometry_msgs::TransformStamped pose, ros::NodeHandle &node_handle)
+void CallSetPoseService(string camera_id, geometry_msgs::TransformStamped pose)
 {
-  ros::ServiceClient client = ros::ServiceClient(node_handle.serviceClient<netcam_stream::SetPose>(base_url 
-        + camera_id + "/set_pose"));
   set_pose_srv.request.pose = pose;
-  if(client.call(set_pose_srv))
+  
+  if(!ros::service::call(base_url + camera_id + "/set_pose", set_pose_srv))
   {
-    ROS_INFO_STREAM("[CAMERA_NODE_" + camera_id + "]: Calling  setpose service for node ");
-    if(!set_pose_srv.response.calibrated)
-      CallSetPoseService(camera_id,pose,node_handle);
+    ROS_ERROR_STREAM("[CALIBRATION_MASTER_NODE]: Error in calling service to set pose. Pose not set for camera: " << camera_id);
   }
-  ROS_INFO_STREAM("[CAMERA_NODE_" + camera_id + "]: Pose set!");
 }
 
 // Returns true of camera is calibrated.
@@ -196,7 +163,7 @@ bool CheckCameraCalibrated(string camera_id)
   bool result = false;
   for(list<CamCalibInfo>::iterator iter = calibrated_cameras.begin(); iter != calibrated_cameras.end(); iter++)
   {
-    if(camera_id.compare(CamCalibInfo(*iter).camera_id) == 0)
+    if(camera_id.compare(iter->camera_id) == 0)
     {
       result = true;
       break;
@@ -206,30 +173,16 @@ bool CheckCameraCalibrated(string camera_id)
 }
 
 
-void CalculateCamPose(ros::NodeHandle &node_handle)
+void CalculateCamPose()
 {
   mtx.lock();
-  Eigen::Affine3d pose_aff, calib_cam_pose;
-  CamCalibInfo temp,cur;
+  Eigen::Affine3d pose_aff, calib_cam_pose, temp_pose;
+  CamCalibInfo cur;
   list<CamCalibInfo> calib_camera_list, uncalib_camera_list;
-  ROS_INFO_STREAM("\n\n[CALIBRATION_MASTER_NODE]: Calculating cam pose: " << current_cam_info.size());
   if(current_cam_info.size() == 0) // No camera transform received.
   {
     mtx.unlock();
     return;
-  }
-
-  string s1 = "";
-  for(list<CamCalibInfo>::iterator t1 = calibrated_cameras.begin(); t1 != calibrated_cameras.end(); t1++)
-  {
-    s1 += t1->camera_id;
-  }
-
-  ROS_INFO_STREAM("Calibrated cameras: " << s1);
-
-  for(list<CamCalibInfo>::iterator cam_iter = current_cam_info.begin(); cam_iter != current_cam_info.end(); cam_iter++)
-  {
-    ROS_INFO_STREAM(cam_iter->camera_id << ": " << cam_iter->camera_transform);
   }
   
   // We are starting calibration by keeping chessboard at the origin of the lab.
@@ -237,14 +190,13 @@ void CalculateCamPose(ros::NodeHandle &node_handle)
   {
     for(list<CamCalibInfo>::iterator cam_iter = current_cam_info.begin(); cam_iter != current_cam_info.end(); cam_iter++)
     {
-      temp = CamCalibInfo(*cam_iter);
       CamCalibInfo cam_transform;
-      cam_transform.camera_id = temp.camera_id;
-      pose_aff = tf2::transformToEigen(temp.camera_transform);
+      cam_transform.camera_id = cam_iter->camera_id;
+      pose_aff = tf2::transformToEigen(cam_iter->camera_transform);
       cam_transform.camera_transform = tf2::eigenToTransform(pose_aff);
       calibrated_cameras.push_back(cam_transform);
       
-      CallSetPoseService(temp.camera_id,temp.camera_transform,node_handle);
+      CallSetPoseService(cam_iter->camera_id,cam_iter->camera_transform);
     }
     mtx.unlock();
     return;
@@ -253,11 +205,11 @@ void CalculateCamPose(ros::NodeHandle &node_handle)
   // Some of the cameras have already been calibrated.
   // Separating the calibrated and uncalibrated camera lists.
   int list_size = current_cam_info.size();
-  list<CamCalibInfo>::iterator cam_temp, cam_iter = current_cam_info.begin();
+  list<CamCalibInfo>::iterator cam_iter = current_cam_info.begin();
   do
   {
 
-    if(CheckCameraCalibrated(CamCalibInfo(*cam_iter).camera_id)) // Camera is calibrated.
+    if(CheckCameraCalibrated(cam_iter->camera_id)) // Camera is calibrated.
     {
       calib_camera_list.push_back(CamCalibInfo(*cam_iter));
     }
@@ -299,17 +251,16 @@ void CalculateCamPose(ros::NodeHandle &node_handle)
     pose_aff = tf2::transformToEigen(cur.camera_transform);
     for(list<CamCalibInfo>::iterator calib_iter = calib_camera_list.begin(); calib_iter != calib_camera_list.end(); calib_iter++)
     {
-      temp = CamCalibInfo(*calib_iter);
-      calib_cam_pose = tf2::transformToEigen(temp.camera_transform);
+      calib_cam_pose = tf2::transformToEigen(calib_iter->camera_transform);
       calib_cam_pose = calib_cam_pose.inverse();
-      pose_aff = calib_cam_pose * pose_aff;
+      temp_pose = calib_cam_pose * pose_aff;
       for(list<CamCalibInfo>::iterator it = calibrated_cameras.begin(); it != calibrated_cameras.end(); it++)
       {
-        if(CamCalibInfo(*it).camera_id.compare(temp.camera_id) == 0)
+        if(CamCalibInfo(*it).camera_id.compare(calib_iter->camera_id) == 0)
         {
-          pose_aff = tf2::transformToEigen(it->camera_transform) * pose_aff;
+          temp_pose = tf2::transformToEigen(it->camera_transform) * temp_pose;
           cam_pose.camera_id = cur.camera_id;
-          cam_pose.camera_transform = tf2::eigenToTransform(pose_aff);
+          cam_pose.camera_transform = tf2::eigenToTransform(temp_pose);
           x += cam_pose.camera_transform.transform.translation.x;
           y += cam_pose.camera_transform.transform.translation.y;
           z += cam_pose.camera_transform.transform.translation.z;
@@ -333,7 +284,7 @@ void CalculateCamPose(ros::NodeHandle &node_handle)
     }
     
     calibrated_cameras.push_back(cam_pose);
-    CallSetPoseService(cam_pose.camera_id,cam_pose.camera_transform,node_handle);
+    CallSetPoseService(cam_pose.camera_id,cam_pose.camera_transform);
   }
   mtx.unlock();
 }
@@ -343,20 +294,19 @@ void RemoveOutdatedTransform()
 {
   mtx.lock();
   CamCalibInfo last = current_cam_info.back(); // Latest entry in the list.
-  CamCalibInfo cur,temp;
   double threshold, cur_stamp, last_stamp = last.camera_transform.header.stamp.toSec();
   for(list<CamCalibInfo>::iterator cam_iter = current_cam_info.begin(); cam_iter != current_cam_info.end(); cam_iter++)
     {
-      cur = CamCalibInfo(*cam_iter);
-      cur_stamp = cur.camera_transform.header.stamp.toSec();
+      cur_stamp = cam_iter->camera_transform.header.stamp.toSec();
       threshold = abs(cur_stamp - last_stamp);
 
       // Remove the transform if the time difference is more than 1 minute.
       if(threshold > 60)
       {
-        ROS_INFO_STREAM("\n\n[CALIBRATION_MASTER_NODE]: Erased old transform: " << CamCalibInfo(*cam_iter).camera_id << ": " << abs(cur_stamp - last_stamp));
-        current_cam_info.erase(cam_iter);
-        cam_iter--;
+        ROS_INFO_STREAM("\n\n[CALIBRATION_MASTER_NODE]: Erased old transform: " << CamCalibInfo(*cam_iter).camera_id << ": " 
+          << abs(cur_stamp - last_stamp));
+        //current_cam_info.erase(cam_iter);
+        //cam_iter--;
       }
     }
   mtx.unlock();
@@ -366,15 +316,12 @@ void ListenCameraTransform(string origin)
 {
   tf::TransformListener listener;
   tf::StampedTransform transform;
-  ros::Duration(10).sleep();
   for(list<string>::iterator it = cam_id_list.begin(); it != cam_id_list.end(); it++)
   {
     try
     {
       CamCalibInfo cam_temp;
-      ROS_INFO_STREAM(origin << string(*it));
-      listener.waitForTransform("/" + origin,"/" + string(*it),ros::Time(0),ros::Duration(1));
-      ROS_INFO_STREAM(origin << string(*it));
+      listener.waitForTransform("/" + origin,"/" + string(*it),ros::Time(0),ros::Duration(10));
       listener.lookupTransform("/" + origin,"/" + string(*it),ros::Time(0), transform);
       
       cam_temp.camera_id = string(*it);
@@ -386,8 +333,6 @@ void ListenCameraTransform(string origin)
       transform_temp.child_frame_id = cam_temp.camera_id;
       cam_temp.camera_transform = transform_temp;
 
-      ROS_INFO_STREAM("\n\n[CALIBRATION_MASTER_NODE]: Found transform for: " << cam_temp.camera_id);
-    
       calibrated_cameras.push_back(cam_temp);
     }
     catch (tf::TransformException ex)
@@ -397,24 +342,27 @@ void ListenCameraTransform(string origin)
   }
 }
 
-void CalibrateCamSystem(ros::NodeHandle &node_handle)
+void PrintCalibratedNodes()
+{
+  string calib_cam = "";
+  list<CamCalibInfo>::iterator i;
+  for(i = calibrated_cameras.begin(); i != calibrated_cameras.end(); i++)
+  {
+    calib_cam += i->camera_id + " ";
+  }
+}
+
+void CalibrateCamSystem()
 {
   // Create thread for each camera transform subscriber.
   boost::thread_group cam_thread_list;
   for(list<string>::iterator cam_id_iter = cam_id_list.begin(); cam_id_iter != cam_id_list.end(); cam_id_iter++)
   {
-    cam_thread_list.create_thread(boost::bind(CallTransformService,string(*cam_id_iter),node_handle));
+    cam_thread_list.create_thread(boost::bind(CallTransformService,string(*cam_id_iter)));
   }
+
   // Wait for all the threads to get their respective camera transforms.
   cam_thread_list.join_all();
-
-  ROS_INFO_STREAM("[CALIBRATION_MASTER_NODE]: The Chessboard can be moved now.");
-  for(int n = 1; n <= 5; n++)
-  {
-    ros::Duration(1).sleep();
-    ROS_INFO_STREAM("[CALIBRATION_MASTER_NODE]: " << n);
-  }
-  
 
   if(current_cam_info.size() > 0) // Atleast 1 camera found the chessboard.
   {
@@ -422,7 +370,16 @@ void CalibrateCamSystem(ros::NodeHandle &node_handle)
     RemoveOutdatedTransform();
 
     // Calculate the transform of the cameras which detected the chessboard.
-    CalculateCamPose(node_handle);
+    CalculateCamPose();
+
+    PrintCalibratedNodes();
+  }
+
+  ROS_INFO_STREAM("[CALIBRATION_MASTER_NODE]: The Chessboard can be moved now within the next 10 seconds.");
+  for(int n = 10; n > 0; n--)
+  {
+    ROS_INFO_STREAM("[CALIBRATION_MASTER_NODE]: " << n);
+    ros::Duration(1).sleep();
   }
   ROS_INFO_STREAM("[CALIBRATION_MASTER_NODE]: Do not move the chessboard.");
 }
@@ -436,7 +393,7 @@ int CamListCompare()
     x = 0;
     for(list<CamCalibInfo>::iterator t = calibrated_cameras.begin(); t != calibrated_cameras.end(); t++)
     {
-      if(string(*i).compare(CamCalibInfo(*t).camera_id) == 0)
+      if(string(*i).compare(t->camera_id) == 0)
       {
         x = 1;
         count++;
@@ -455,13 +412,12 @@ int main(int argc, char** argv)
     ros::init(argc, argv, "calibration_node");
     ros::NodeHandle node_handle("~");
     vector<boost::thread> cam_thread;
-    string service_name,origin;
-    int temp;
+    string origin;
     
     // Publisher to indicate camera node shutdown.
     ros::Publisher camera_node_shutdown = node_handle.advertise<std_msgs::String>("camera_node_shutdown", 10);
     std_msgs::String msg;
-
+    
     // Get string containing camera IDs
     string all_camera_id;
     if(!node_handle.getParam("all_camera_id", all_camera_id)){
@@ -482,8 +438,6 @@ int main(int argc, char** argv)
 
     ListenCameraTransform(origin);
 
-    ROS_INFO_STREAM(calibrated_cameras.size());
-   
     for(cam_id_iter = cam_id_list.begin(); cam_id_iter != cam_id_list.end(); cam_id_iter++)
     {
       ros::ServiceClient client_temp = ros::ServiceClient(node_handle.serviceClient<netcam_stream::ChessPose>(base_url 
@@ -494,19 +448,21 @@ int main(int argc, char** argv)
     ros::Duration(3).sleep();
     while(CamListCompare() != 1 && ros::ok())
     {
-      CalibrateCamSystem(node_handle);
+      CalibrateCamSystem();
       current_cam_info.clear();
-      thread_count = 0;
       msg.data = cam_shut_nodes;
       camera_node_shutdown.publish(msg);
+      PrintCalibratedNodes();
     }
     msg.data = all_camera_id;
-    ROS_INFO_STREAM("\n\nAll cameras have been calibrated!\n\n");
+
+    ROS_INFO_STREAM("\n\n[CALIBRATION_MASTER_NODE]: All the cameras have been calibrated!\n\n");
     while(ros::ok())
     {
       camera_node_shutdown.publish(msg);
       ros::Duration(0.5).sleep();
     }
+
     ros::spinOnce();
     return 0;
 }
