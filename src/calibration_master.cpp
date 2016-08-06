@@ -350,6 +350,7 @@ void PrintCalibratedNodes()
   {
     calib_cam += i->camera_id + " ";
   }
+  ROS_INFO_STREAM("[CALIBRATION_MASTER_NODE]: Calibrated cameras: " << calib_cam);
 }
 
 void CalibrateCamSystem()
